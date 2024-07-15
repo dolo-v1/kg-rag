@@ -12,6 +12,7 @@ class Neo4jHandler:
     def session(self, **kwargs):
         return self.driver.session(**kwargs)
 
+
 def get_comp(tx, drug_name):
     query = """
     MATCH (d:Drug {name: $drug_name})-[:CONTAINS]->(c:Chemical)-[:QUANTITY]->(dos:Dosage), (d)-[:HAS_DOSAGE]->(dos)
@@ -19,6 +20,7 @@ def get_comp(tx, drug_name):
     """
     result = tx.run(query, drug_name=drug_name)
     return result.data()
+
 
 def get_similar_drugs(tx, drug_name):
     query = """
@@ -48,7 +50,7 @@ def get_context(drug_name):
             prev = record["Drug"]
             l.append(f"{record['Chemical']}, {record['Dosage']}")
 
-        context = context[:2**16]
+        context = context[: 2**15]
         results = session.execute_read(get_comp, drug_name)
         context += f"Drug : {drug_name}\nConstituents : "
         for record in results:
@@ -63,7 +65,7 @@ def run_sub(drug_name):
         [
             "ollama",
             "run",
-            "llama3",
+            "mistral",
             f"given context {context}, select the tablet having the same combination of chemicals and dosage as {drug_name}",
         ],
         capture_output=True,
@@ -84,7 +86,7 @@ handler = Neo4jHandler(
     password,
 )
 
-out, err = run_sub("Fenasal-PT4 Tablet")
+out, err = run_sub("XREL Tablet")
 print(out)
 if err:
     print(err)
