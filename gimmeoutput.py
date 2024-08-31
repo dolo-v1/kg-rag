@@ -1,11 +1,10 @@
 import subprocess
 import csv
 from typing import List, Dict
+import concurrent.futures
 
 
-def completion(
-    prompt: str,
-) -> str:
+def completion(prompt: str) -> str:
     command = ["ollama", "run", "llama3.1", prompt]
     result = subprocess.run(command, capture_output=True, text=True)
     return result.stdout.strip()
@@ -30,19 +29,36 @@ def load_conversations(filename: str) -> List[Dict[str, str]]:
 
 
 def classify_text_with_llama(text: str) -> str:
-    prompt = f"Classify the following text: '{text}'\nIs this about medicines or drugs? Respond only with 'Yes' or 'No' and aboslutely nothing else."
+    prompt = f"Classify the following text: '{text}'\nIs this about medicines or drugs? Respond only with 'Yes' or 'No' and absolutely nothing else."
     response = completion(prompt)
     return response.strip().lower()
 
 
 def filter_with_llama(conversations: List[Dict[str, str]]) -> List[Dict[str, str]]:
     filtered_conversations = []
-    for i, conversation in enumerate(conversations):
+
+    def classify_and_filter(conversation):
         question = conversation["question"]
         if classify_text_with_llama(question) == "yes":
-            filtered_conversations.append(conversation)
-        if i % 100 == 0:
-            print(f"Processed {i} conversations.")
+            return conversation
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(classify_and_filter, conversation)
+            for conversation in conversations
+        ]
+        for i, future in enumerate(concurrent.futures.as_completed(futures)):
+            result = future.result()
+            if result:
+                filtered_conversations.append(result)
+            if i % 100 == 0:
+                print(f"Processed {i} conversations.")
+            if i % 10000 == 0 and i > 0:
+                print(f"Saving {i} conversations.")
+                save_filtered_conversations(filtered_conversations, f"csvs/filtered_conversations{i}.csv")
+                filtered_conversations = []
+
     return filtered_conversations
 
 
@@ -58,10 +74,10 @@ def main(input_file: str, output_file: str):
     print(f"Loaded {len(conversations)} conversations.")
     filtered_conversations = filter_with_llama(conversations)
     print(f"Filtered {len(filtered_conversations)} conversations.")
-    save_filtered_conversations(filtered_conversations, output_file)
+    # save_filtered_conversations(filtered_conversations, output_file)
 
 
 if __name__ == "__main__":
-    input_file = "test.csv"
+    input_file = "train.csv"
     output_file = "filtered_conversations.csv"
     main(input_file, output_file)
