@@ -72,7 +72,7 @@ def save_filtered_conversations(conversations: List[Dict[str, str]], filename: s
 def main(input_file: str, output_file: str):
     conversations = load_conversations(input_file)
     print(f"Loaded {len(conversations)} conversations.")
-    filtered_conversations = filter_with_llama(conversations)
+    filtered_conversations = filter_with_llama(conversations[40000:])
     print(f"Filtered {len(filtered_conversations)} conversations.")
     # save_filtered_conversations(filtered_conversations, output_file)
 
